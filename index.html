@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星海契約 - 抽卡模擬器</title>
+    <style>
+        :root {
+            --bg: #0a0e17;
+            --panel: #111827;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --gold: #fbbf24;
+            --purple: #a855f7;
+            --blue: #3b82f6;
+            --bronze: #b45309;
+            --gray: #6b7280;
+            --rainbow-1: #ff6b6b;
+            --rainbow-2: #ffd93d;
+            --rainbow-3: #6bcb77;
+            --rainbow-4: #4d96ff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image:
+                radial-gradient(ellipse at 50% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 70%),
+                radial-gradient(ellipse at 20% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+            overflow-x: hidden;
+        }
+
+        /* 星空背景粒子 */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--dur) ease-in-out infinite;
+            animation-delay: var(--delay);
+            opacity: 0;
+        }
+        @keyframes twinkle {
+            0%,
+            100% {
+                opacity: 0.2;
+            }
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* 標題 */
+        .header {
+            text-align: center;
+            padding: 10px 0;
+        }
+        .header h1 {
+            font-size: 2rem;
+            background: linear-gradient(135deg, #c084fc, #818cf8, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 4px;
+        }
+        .header .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+        }
+
+        /* 資源欄 */
+        .resources {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            padding: 12px 20px;
+            background: var(--panel);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .resource-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+        .resource-item .icon {
+            font-size: 1.4rem;
+        }
+        .resource-item .value {
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+            font-family: 'Courier New', monospace;
+            min-width: 50px;
+        }
+        .resource-item.gems .value {
+            color: #38bdf8;
+        }
+        .resource-item.marks .value {
+            color: #fbbf24;
+        }
+        .resource-item.dust .value {
+            color: #a78bfa;
+        }
+
+        /* 主區域 */
+        .main-area {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        /* 召喚區 */
+        .summon-zone {
+            flex: 1;
+            min-width: 300px;
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summon-circle {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.5s ease;
+        }
+        .summon-circle::before {
+            content: '';
+            position: absolute;
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            border: 1px dashed rgba(255, 255, 255, 0.1);
+            animation: spin 12s linear infinite;
+        }
+        .summon-circle::after {
+            content: '✦';
+            font-size: 3rem;
+            color: rgba(255, 255, 255, 0.4);
+            animation: pulse 3s ease-in-out infinite;
+        }
+        .summon-circle.spinning::before {
+            animation: spin 0.4s linear infinite;
+        }
+        .summon-circle.spinning::after {
+            content: '✧';
+            animation: pulseFast 0.3s ease-in-out infinite;
+        }
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 0.4;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.1);
+            }
+        }
+        @keyframes pulseFast {
+            0%,
+            100% {
+                opacity: 0.6;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+
+        .pity-info {
+            display: flex;
+            gap: 24px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .pity-info span {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .btn {
+            padding: 12px 28px;
+            border-radius: 25px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-single {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+        .btn-single:hover:not(:disabled) {
+            box-shadow: 0 6px 25px rgba(99, 102, 241, 0.5);
+            transform: translateY(-1px);
+        }
+        .btn-multi {
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            color: white;
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+            animation: gentlePulse 2s ease-in-out infinite;
+        }
+        .btn-multi:hover:not(:disabled) {
+            box-shadow: 0 6px 25px rgba(168, 85, 247, 0.5);
+            transform: translateY(-1px);
+        }
+        @keyframes gentlePulse {
+            0%,
+            100% {
+                box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+            }
+            50% {
+                box-shadow: 0 4px 25px rgba(168, 85, 247, 0.6);
+            }
+        }
+        .btn-cost {
+            display: block;
+            font-size: 0.7rem;
+            opacity: 0.8;
+            letter-spacing: 0;
+            font-weight: normal;
+        }
+
+        /* 結果彈窗 */
+        .result-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        .result-card {
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            min-width: 300px;
+            max-width: 500px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            animation: cardPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes cardPop {
+            from {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .result-card.ssr-glow {
+            border-color: #fbbf24;
+            box-shadow: 0 0 40px rgba(251, 191, 36, 0.4), 0 0 80px rgba(251, 191, 36, 0.2);
+        }
+        .result-card.ur-glow {
+            border-color: transparent;
+            background: var(--panel);
+            box-shadow: 0 0 30px rgba(255, 107, 107, 0.5), 0 0 60px rgba(255, 217, 61, 0.4), 0 0 90px rgba(107, 203, 119, 0.3), 0 0 120px rgba(77, 150, 255, 0.2);
+            animation: cardPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), rainbowPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes rainbowPulse {
+            0%,
+            100% {
+                box-shadow: 0 0 30px rgba(255, 107, 107, 0.5), 0 0 60px rgba(255, 217, 61, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 50px rgba(107, 203, 119, 0.6), 0 0 90px rgba(77, 150, 255, 0.5);
+            }
+        }
+        .card-rarity-label {
+            display: inline-block;
+            padding: 4px 16px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+        .rarity-N {
+            background: #374151;
+            color: #9ca3af;
+        }
+        .rarity-R {
+            background: #3b2200;
+            color: #f59e0b;
+        }
+        .rarity-SR {
+            background: #2d1045;
+            color: #c084fc;
+        }
+        .rarity-SSR {
+            background: #3d2e00;
+            color: #fbbf24;
+        }
+        .rarity-UR {
+            background: linear-gradient(135deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff);
+            color: #000;
+            font-weight: 900;
+            animation: rainbowBg 2s linear infinite;
+        }
+        @keyframes rainbowBg {
+            0% {
+                filter: hue-rotate(0deg);
+            }
+            100% {
+                filter: hue-rotate(360deg);
+            }
+        }
+        .card-emoji {
+            font-size: 4rem;
+            margin: 10px 0;
+        }
+        .card-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+        .card-title-text {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin: 4px 0;
+        }
+        .card-element {
+            font-size: 0.8rem;
+            margin: 4px 0;
+        }
+        .card-lore {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 8px;
+            line-height: 1.5;
+            font-style: italic;
+        }
+        .btn-close {
+            margin-top: 16px;
+            padding: 10px 30px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .btn-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 記錄區 */
+        .history-panel {
+            flex: 0 0 280px;
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .history-panel h3 {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            letter-spacing: 2px;
+        }
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .history-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .dot-N {
+            background: #6b7280;
+        }
+        .dot-R {
+            background: #f59e0b;
+        }
+        .dot-SR {
+            background: #a855f7;
+        }
+        .dot-SSR {
+            background: #fbbf24;
+            box-shadow: 0 0 6px #fbbf24;
+        }
+        .dot-UR {
+            background: white;
+            box-shadow: 0 0 8px #ff6b6b, 0 0 12px #ffd93d;
+            animation: urDotPulse 1s ease-in-out infinite;
+        }
+        @keyframes urDotPulse {
+            0%,
+            100% {
+                box-shadow: 0 0 8px #ff6b6b, 0 0 12px #ffd93d;
+            }
+            50% {
+                box-shadow: 0 0 16px #ff6b6b, 0 0 24px #ffd93d;
+            }
+        }
+        .history-empty {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* 響應式 */
+        @media (max-width: 768px) {
+            .main-area {
+                flex-direction: column;
+            }
+            .history-panel {
+                flex: 0 0 auto;
+                max-height: 250px;
+            }
+            .summon-circle {
+                width: 150px;
+                height: 150px;
+            }
+            .summon-circle::before {
+                width: 135px;
+                height: 135px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 星空背景 -->
+    <div class="stars" id="stars"></div>
+
+    <div class="container">
+        <!-- 標題 -->
+        <div class="header">
+            <h1>✧ 星 海 契 約 ✧</h1>
+            <div class="subtitle">STELLAR OATH · 星魂召喚模擬器</div>
+        </div>
+
+        <!-- 資源欄 -->
+        <div class="resources">
+            <div class="resource-item gems">
+                <span class="icon">💎</span>
+                <span>星輝石</span>
+                <span class="value" id="gemsDisplay">30000</span>
+            </div>
+            <div class="resource-item marks">
+                <span class="icon">📜</span>
+                <span>契約印記</span>
+                <span class="value" id="marksDisplay">30</span>
+            </div>
+            <div class="resource-item dust">
+                <span class="icon">✨</span>
+                <span>星塵碎片</span>
+                <span class="value" id="dustDisplay">0</span>
+            </div>
+        </div>
+
+        <!-- 主區域 -->
+        <div class="main-area">
+            <!-- 召喚區 -->
+            <div class="summon-zone" id="summonZone">
+                <div class="pity-info">
+                    SSR 保底：<span id="ssrPity">0</span>/90
+                    &nbsp;|&nbsp;
+                    UR 保底：<span id="urPity">0</span>/200
+                </div>
+                <div class="summon-circle" id="summonCircle"></div>
+                <div class="btn-row">
+                    <button class="btn btn-single" id="btnSingle">
+                        單次召喚
+                        <span class="btn-cost">📜×1 或 💎×300</span>
+                    </button>
+                    <button class="btn btn-multi" id="btnMulti">
+                        十連召喚
+                        <span class="btn-cost">📜×10 或 💎×3000</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 記錄區 -->
+            <div class="history-panel" id="historyPanel">
+                <h3>📋 召喚記錄</h3>
+                <div class="history-empty">尚無記錄，開始召喚吧 ✦</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 結果彈窗（隱藏） -->
+    <div class="result-overlay" id="resultOverlay" style="display:none;">
+        <div class="result-card" id="resultCard"></div>
+    </div>
+
+    <script>
+        // ==================== 星空背景生成 ====================
+        (function createStars() {
+            const container = document.getElementById('stars');
+            const count = 120;
+            for (let i = 0; i < count; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                const size = Math.random() * 2 + 1;
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.setProperty('--dur', (Math.random() * 3 + 2) + 's');
+                star.style.setProperty('--delay', Math.random() * 5 + 's');
+                container.appendChild(star);
+            }
+        })();
+
+        // ==================== 遊戲資料 ====================
+        const cardDB = [
+            // UR x2
+            { id: 'UR_01', name: '終焉觀測者 · 艾恩', title: '時間盡頭的守望者', rarity: 'UR', element: '🌌 虛空',
+                emoji: '🔮', lore: '據說他是宇宙熱寂後唯一殘存的意識體，穿越無盡時間線，只為尋找下一個大爆炸的奇點。', },
+            { id: 'UR_02', name: '星海創世者 · 奧莉薇亞', title: '萬千銀河的編織者', rarity: 'UR', element: '✨ 聖光',
+                emoji: '👼', lore: '她曾在虛無中輕聲呢喃，於是第一顆星辰誕生。億萬年後，她的歌聲仍在星雲間迴盪。', },
+
+            // SSR x6
+            { id: 'SSR_01', name: '蒼穹騎士 · 雷恩', title: '不滅的守護之盾', rarity: 'SSR', element: '✨ 聖光', emoji: '🛡️',
+                lore: '聖光騎士團的最後一位傳人，他的盾牌據說由一顆死去的恆星核心鍛造而成。', },
+            { id: 'SSR_02', name: '暗影舞者 · 莉莉絲', title: '深淵的優雅刺客', rarity: 'SSR', element: '🕶️ 暗影', emoji: '🗡️',
+                lore: '她在影子之間穿梭自如，沒人見過她的真面目，因為見過的人早已不在人世。', },
+            { id: 'SSR_03', name: '星焰之翼 · 菲尼克斯', title: '浴火重生的不死鳥', rarity: 'SSR', element: '🔥 火焰', emoji: '🔥',
+                lore: '每當銀河系陷入黑暗，牠便會從太陽的核心中重生，帶來新一輪的文明之火。', },
+            { id: 'SSR_04', name: '冰霜女皇 · 艾莎琳', title: '永凍星域的統治者', rarity: 'SSR', element: '❄️ 冰霜', emoji: '❄️',
+                lore: '她的呼吸能凍結時間本身，在她統治的星域中，連光線都變得緩慢而優雅。', },
+            { id: 'SSR_05', name: '雷霆戰將 · 沃爾特', title: '風暴之錘的持有者', rarity: 'SSR', element: '⚡ 雷電', emoji: '⚡',
+                lore: '他的戰鎚每次揮舞都會引發星際風暴，敵人的艦隊在雷光中灰飛煙滅。', },
+            { id: 'SSR_06', name: '虛空行者 · 薩爾', title: '次元裂縫的旅人', rarity: 'SSR', element: '🌌 虛空', emoji: '🌀',
+                lore: '他自願踏入虛空裂縫，在無盡的次元之間流浪，只為尋找失落的故鄉。', },
+
+            // SR x7
+            { id: 'SR_01', name: '烈焰劍士 · 凱恩', title: '炎之劍的繼承者', rarity: 'SR', element: '🔥 火焰', emoji: '⚔️',
+                lore: '年輕的劍士在火山口修行十年，終於喚醒了沉睡在岩漿中的火焰之劍。', },
+            { id: 'SR_02', name: '寒冰射手 · 凜', title: '極光下的狙擊手', rarity: 'SR', element: '❄️ 冰霜', emoji: '🏹',
+                lore: '她射出的箭矢會在擊中目標前將周圍的一切凍結，連爆炸都無法掙脫。', },
+            { id: 'SR_03', name: '雷鳴法師 · 澤諾', title: '暴風雨的吟唱者', rarity: 'SR', element: '⚡ 雷電', emoji: '🧙',
+                lore: '他只需低語一個音節，天空便會降下萬鈞雷霆，將黑暗驅散殆盡。', },
+            { id: 'SR_04', name: '聖光祭司 · 艾琳', title: '治癒之光的傳播者', rarity: 'SR', element: '✨ 聖光', emoji: '💫',
+                lore: '她的祈禱能讓瀕死的恆星重新綻放光芒，是銀河系最受敬重的醫者。', },
+            { id: 'SR_05', name: '暗影斥候 · 影', title: '無聲的潛入者', rarity: 'SR', element: '🕶️ 暗影', emoji: '🥷',
+                lore: '他在黑暗中移動時不會驚動任何粒子，是情報戰中最可怕的存在。', },
+            { id: 'SR_06', name: '星塵術士 · 米拉', title: '星塵的操縱者', rarity: 'SR', element: '🌌 虛空', emoji: '🌟',
+                lore: '她能將散落的星塵重組為任何形狀，小到一把鑰匙，大到一座星際之門。', },
+            { id: 'SR_07', name: '鋼鐵守衛 · 蓋倫', title: '不破的鐵壁', rarity: 'SR', element: '✨ 聖光', emoji: '🛡️',
+                lore: '退役老兵自願接受機械改造，以鋼鐵之軀守護新一代的契約者。', },
+
+            // R x3
+            { id: 'R_01', name: '新兵 · 艾倫', title: '初出茅廬的戰士', rarity: 'R', element: '🔥 火焰', emoji: '💂',
+                lore: '剛從軍事學院畢業的年輕士兵，雖然經驗不足，但充滿了熱情與勇氣。', },
+            { id: 'R_02', name: '學徒 · 小夜', title: '魔法學院的見習生', rarity: 'R', element: '⚡ 雷電', emoji: '📖',
+                lore: '她還在學習如何控制雷電，偶爾會不小心把自己的頭髮電得捲捲的。', },
+            { id: 'R_03', name: '斥候 · 飛羽', title: '輕裝偵察兵', rarity: 'R', element: '❄️ 冰霜', emoji: '🕊️',
+                lore: '她的腳程飛快，能在暴風雪中準確找到安全的通道。', },
+
+            // N x2
+            { id: 'N_01', name: '星塵史萊姆', title: '可愛的星際生物', rarity: 'N', element: '🌌 虛空', emoji: '🟢',
+                lore: '一種在星際間常見的無害生物，以星塵為食，摸起來軟軟的很受歡迎。', },
+            { id: 'N_02', name: '機械哨兵', title: '基礎防衛單位', rarity: 'N', element: '⚡ 雷電', emoji: '🤖',
+                lore: '量產型的小型機器人，只會執行最基本的巡邏和警報任務。', },
+        ];
+
+        // ==================== 遊戲狀態 ====================
+        let state = {
+            gems: 30000,
+            marks: 30,
+            dust: 0,
+            ssrPity: 0,
+            urPity: 0,
+            totalPulls: 0,
+            multiPulls: 0,
+            srCount: 0,
+            ssrCount: 0,
+            urCount: 0,
+            uniqueSRPlus: new Set(),
+            history: [],
+            isDrawing: false,
+        };
+
+        // 從 localStorage 載入
+        function loadState() {
+            const saved = localStorage.getItem('stellarOath_save');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                    state.uniqueSRPlus = new Set(parsed.uniqueSRPlus || []);
+                } catch (e) {
+                    console.log('存檔損毀，使用預設值');
+                }
+            }
+        }
+
+        function saveState() {
+            const toSave = { ...state, uniqueSRPlus: [...state.uniqueSRPlus] };
+            localStorage.setItem('stellarOath_save', JSON.stringify(toSave));
+        }
+
+        // ==================== UI 更新 ====================
+        function updateUI() {
+            document.getElementById('gemsDisplay').textContent = state.gems.toLocaleString();
+            document.getElementById('marksDisplay').textContent = state.marks;
+            document.getElementById('dustDisplay').textContent = state.dust.toLocaleString();
+            document.getElementById('ssrPity').textContent = state.ssrPity;
+            document.getElementById('urPity').textContent = state.urPity;
+
+            // 按鈕狀態
+            const canSingle = state.marks >= 1 || state.gems >= 300;
+            const canMulti = state.marks >= 10 || state.gems >= 3000;
+            document.getElementById('btnSingle').disabled = !canSingle || state.isDrawing;
+            document.getElementById('btnMulti').disabled = !canMulti || state.isDrawing;
+
+            updateHistoryUI();
+        }
+
+        function updateHistoryUI() {
+            const panel = document.getElementById('historyPanel');
+            if (state.history.length === 0) {
+                panel.innerHTML = '<h3>📋 召喚記錄</h3><div class="history-empty">尚無記錄，開始召喚吧 ✦</div>';
+                return;
+            }
+            let html = '<h3>📋 召喚記錄</h3>';
+            // 顯示最近 30 筆
+            const recent = state.history.slice(-30).reverse();
+            for (const record of recent) {
+                html += `
+                    <div class="history-item">
+                        <span class="history-dot dot-${record.rarity}"></span>
+                        <span style="flex:1;">${record.name}</span>
+                        <span style="color:var(--text-dim);font-size:0.7rem;">${record.rarity}</span>
+                    </div>`;
+            }
+            if (state.history.length > 30) {
+                html +=
+                    `<div style="text-align:center;color:var(--text-dim);font-size:0.7rem;">...還有 ${state.history.length - 30} 筆記錄</div>`;
+            }
+            panel.innerHTML = html;
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        // ==================== 抽卡核心邏輯 ====================
+        function getRandomCardByRarity(rarity) {
+            const pool = cardDB.filter(c => c.rarity === rarity);
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+
+        function determineRarity() {
+            // UR 硬保底
+            if (state.urPity >= 199) {
+                return 'UR';
+            }
+
+            // SSR 軟保底
+            let ssrRate = 0.03;
+            if (state.ssrPity >= 73) {
+                ssrRate = 0.03 + (state.ssrPity - 73) * 0.06;
+                if (ssrRate > 1) ssrRate = 1;
+            }
+            // SSR 硬保底
+            if (state.ssrPity >= 89) {
+                return 'SSR';
+            }
+
+            const roll = Math.random();
+            if (roll < 0.006) return 'UR';
+            if (roll < 0.006 + ssrRate) return 'SSR';
+            if (roll < 0.006 + ssrRate + 0.15) return 'SR';
+            if (roll < 0.006 + ssrRate + 0.15 + 0.314) return 'R';
+            return 'N';
+        }
+
+        function performSinglePull() {
+            let rarity = determineRarity();
+            const card = getRandomCardByRarity(rarity);
+
+            // 更新保底
+            state.totalPulls++;
+            if (rarity === 'SSR' || rarity === 'UR') {
+                state.ssrPity = 0;
+            } else {
+                state.ssrPity++;
+            }
+            if (rarity === 'UR') {
+                state.urPity = 0;
+            } else {
+                state.urPity++;
+            }
+
+            // 更新統計
+            if (rarity === 'SR') state.srCount++;
+            if (rarity === 'SSR') state.ssrCount++;
+            if (rarity === 'UR') state.urCount++;
+            if (['SR', 'SSR', 'UR'].includes(rarity)) state.uniqueSRPlus.add(card.id);
+
+            // 星塵
+            const dustMap = { N: 1, R: 5, SR: 30, SSR: 150, UR: 500 };
+            state.dust += dustMap[rarity];
+
+            // 記錄
+            state.history.push({ name: card.name, rarity: card.rarity, time: new Date().toLocaleTimeString() });
+
+            return card;
+        }
+
+        function performMultiPull() {
+            state.multiPulls++;
+            const cards = [];
+            for (let i = 0;
